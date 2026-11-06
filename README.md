@@ -12,7 +12,9 @@ So this is my attempt to do it properly: C sources that compile to code as close
 src/                  crackme0x00.c ... crackme0x09.c
 bin/<os>-<arch>/      pre-compiled binaries
 CMakeLists.txt        build for whatever else you have
-cmake/                toolchain files for 32-bit Linux and cross-compiling to Windows
+cmake/                toolchain files for 32-bit and ARM64 Linux and for Windows
+build-all.sh          rebuild everything in bin/
+Dockerfile            the Linux and Windows build environment used by build-all.sh
 ```
 
 | OS      | x32                 | x64               | arm64               |
@@ -87,6 +89,9 @@ This builds for the machine you're on, and the binaries land in `bin/<os>-<arch>
 # 32-bit Linux on x64 Linux (needs gcc-multilib)
 cmake -S . -B build-x32 -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake
 
+# ARM64 Linux on x64 Linux (needs gcc-aarch64-linux-gnu)
+cmake -S . -B build-arm64 -DCMAKE_TOOLCHAIN_FILE=cmake/linux-aarch64.cmake
+
 # Windows x32 and x64 (needs MinGW-w64)
 cmake -S . -B build-win32 -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-i686.cmake
 cmake -S . -B build-win64 -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-x86_64.cmake
@@ -98,9 +103,33 @@ cmake -S . -B build-winarm64 -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-aarch64.cmake
 cmake -S . -B build-x64 -DCMAKE_OSX_ARCHITECTURES=x86_64
 ```
 
-Then `cmake --build <dir>` as usual. The toolchain files expect the compilers on your `PATH`: `i686-w64-mingw32-gcc`, `x86_64-w64-mingw32-gcc`, and [llvm-mingw](https://github.com/mstorsjo/llvm-mingw)'s `aarch64-w64-mingw32-clang`.
+Then `cmake --build <dir>` as usual. The toolchain files expect the compilers on your `PATH`: `aarch64-linux-gnu-gcc`, `i686-w64-mingw32-gcc`, `x86_64-w64-mingw32-gcc`, and [llvm-mingw](https://github.com/mstorsjo/llvm-mingw)'s `aarch64-w64-mingw32-clang`.
 
 For anything else, write a toolchain file of your own, or use Visual Studio directly (`-A Win32`, `-A x64`, or `-A ARM64`). I've built everything with GCC, Clang (llvm-mingw), Apple Clang, and MinGW, all from Linux and macOS. MSVC should work too, but I haven't tried it, and it links against its own runtime instead of `msvcrt.dll`. Flags that only exist for some targets or compiler versions are checked first and skipped if the compiler doesn't know them.
+
+### Rebuilding the pre-compiled binaries
+
+The binaries in `bin/` come from `build-all.sh`. It builds the Linux and Windows targets in Docker, using the image from the `Dockerfile` (Ubuntu 24.04 with GCC 13, MinGW-w64, and llvm-mingw), so you don't need any of those compilers installed, and the macOS targets natively:
+
+```sh
+./build-all.sh                          # all 8 targets
+./build-all.sh linux-x64 windows-x32    # just these
+```
+
+The targets are `linux-x32`, `linux-x64`, `linux-arm64`, `macos-x64`, `macos-arm64`, `windows-x32`, `windows-x64`, and `windows-arm64`. Each one is configured from scratch in `build/<target>`, and `bin/<target>` is emptied first, so nothing stale survives.
+
+What you need:
+
+- Docker (Docker Desktop or Docker Engine). The image is `linux/amd64`, so it runs natively on x64 and emulated on Apple Silicon (Docker Desktop does that out of the box; on an ARM64 Linux host, set up QEMU with `binfmt` first). The first run builds the image, which takes a few minutes; after that, a full build takes seconds.
+- For the macOS targets, a Mac with the Xcode command-line tools. On Linux, they're skipped.
+
+The Linux and Windows builds are reproducible: the same image gives byte-for-byte the same binaries, wherever it runs. The base image and llvm-mingw are pinned, but the Ubuntu packages come from the live archive, so a GCC or MinGW update can change the result. To get exactly the packages of a given day, take them from Ubuntu's snapshot archive (slower, and only as reliable as `snapshot.ubuntu.com`):
+
+```sh
+APT_SNAPSHOT=20261106T000000Z ./build-all.sh
+```
+
+The macOS binaries depend on the Xcode version: another version gives the same code, but a few header fields differ.
 
 ## Credits
 
