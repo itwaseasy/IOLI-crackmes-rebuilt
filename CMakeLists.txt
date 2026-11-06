@@ -115,6 +115,9 @@ else()
         # MinGW-w64's static runtime brings DWARF debug info; the originals
         # have neither (symbols are kept).
         add_link_options(-Wl,--strip-debug)
+        # No build time in the PE header, so rebuilds are byte-for-byte
+        # reproducible.
+        add_link_options(-Wl,--no-insert-timestamp)
         # ARM64 Windows requires ASLR and DEP, so only x86 can turn them off.
         if(_family STREQUAL "x")
             add_link_flag_if_supported(-Wl,--disable-dynamicbase)   # ASLR
@@ -193,12 +196,15 @@ foreach(src IN LISTS SOURCES)
             RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_CURRENT_BINARY_DIR}/unstripped>"
         )
         # A custom command with a real OUTPUT (not a POST_BUILD step), so a
-        # missing stripped copy is rebuilt and "clean" removes it.
+        # missing stripped copy is rebuilt and "clean" removes it. GNU strip
+        # writes the current time into PE headers unless SOURCE_DATE_EPOCH is
+        # set; other strip tools ignore it.
         set(stripped "${OUTPUT_DIR}/${name}${CMAKE_EXECUTABLE_SUFFIX}")
         add_custom_command(
             OUTPUT "${stripped}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND "${CMAKE_STRIP}" -o "${stripped}" "$<TARGET_FILE:${name}>"
+            COMMAND "${CMAKE_COMMAND}" -E env SOURCE_DATE_EPOCH=0
+                    "${CMAKE_STRIP}" -o "${stripped}" "$<TARGET_FILE:${name}>"
             DEPENDS ${name}
             COMMENT "Stripping ${name}"
             VERBATIM
