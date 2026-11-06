@@ -55,8 +55,10 @@ A modern GCC simply generates code differently from GCC 3.4, and no amount of C 
 
 - Loops are checked at the bottom, not at the top
 - On Linux x86, arguments are pushed instead of stored with `mov [esp], ...`
-- `main` realigns the stack in its prologue
+- `main` sets up its stack differently: on Linux it realigns the stack before the frame is set up, not after, and the 16 bytes of padding GCC 3.4 added after realigning (with a `__chkstk` call on Windows) are gone
 - Stack frames are laid out a bit differently
+
+One more difference comes from glibc, not the compiler: on Linux, today's headers turn `scanf` and `sscanf` into `__isoc99_scanf` and `__isoc99_sscanf`, so those are the names you'll see in the imports and the disassembly. They're the same functions, just following the C99 rules.
 
 If you follow a writeup made with the originals on x86, expect different addresses and stack offsets, but the same logic, conditions, and calls. On Windows x86 the match is even closer, since MinGW still passes arguments the old way. On x64 and arm64 the instructions are a different story anyway, but the program underneath is the same.
 
