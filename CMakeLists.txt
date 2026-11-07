@@ -111,6 +111,9 @@ else()
     endif()
 
     if(WIN32)
+        # MinGW-w64 otherwise links its own C99 printf/scanf; the originals
+        # call msvcrt.dll's, which also handle overflow and bad input their way.
+        add_compile_definitions(__USE_MINGW_ANSI_STDIO=0)
         # MinGW. Newer binutils add a .reloc section even without ASLR, and
         # MinGW-w64's static runtime brings DWARF debug info; the originals
         # have neither (symbols are kept).
