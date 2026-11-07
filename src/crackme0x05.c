@@ -13,10 +13,12 @@ void parell(char* password) {
 }
 
 void check(char* password) {
-    int value;
+    // sscanf() reads past current; in this order, the next byte is i's, as
+    // in the original.
     int sum;
     int i;
     char current;
+    int value;
 
     sum = 0;
     for (i = 0; i < strlen(password); ++i) {
