@@ -14,8 +14,13 @@ if(TARGET_OS STREQUAL "darwin")
 endif()
 
 if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _count)
+    if(_count GREATER 1)
+        message(FATAL_ERROR "Universal binaries aren't supported: the flags "
+            "differ per architecture. Build each one separately.")
+    endif()
     set(_proc "${CMAKE_OSX_ARCHITECTURES}")
-elseif(CMAKE_C_COMPILER_ARCHITECTURE_ID)  # set by MSVC
+elseif(CMAKE_C_COMPILER_ARCHITECTURE_ID)  # MSVC, and GCC/Clang in CMake 4
     set(_proc "${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
 else()
     set(_proc "${CMAKE_SYSTEM_PROCESSOR}")
@@ -114,14 +119,14 @@ else()
         # MinGW-w64 otherwise links its own C99 printf/scanf; the originals
         # call msvcrt.dll's, which also handle overflow and bad input their way.
         add_compile_definitions(__USE_MINGW_ANSI_STDIO=0)
-        # MinGW. Newer binutils add a .reloc section even without ASLR, and
         # MinGW-w64's static runtime brings DWARF debug info; the originals
-        # have neither (symbols are kept).
+        # have none (symbols are kept).
         add_link_options(-Wl,--strip-debug)
         # No build time in the PE header, so rebuilds are byte-for-byte
         # reproducible.
         add_link_options(-Wl,--no-insert-timestamp)
         # ARM64 Windows requires ASLR and DEP, so only x86 can turn them off.
+        # Newer binutils also add a .reloc section even without ASLR.
         if(_family STREQUAL "x")
             add_link_flag_if_supported(-Wl,--disable-dynamicbase)   # ASLR
             add_link_flag_if_supported(-Wl,--disable-nxcompat)      # DEP
